@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Web Speech API自由说中文</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 1em;
+    }
+
+    h2,
+    h3 {
+      font-size: 1.8em;
+    }
+
+    h2 {
+      color: rgb(0, 128, 122);
+      margin-top: 0.5em;
+      margin-bottom: 0.5em;
+    }
+
+    h3 {
+      margin-top: 1em;
+    }
+
+    button {
+      font-size: 24px;
+      padding: 10px 20px;
+      margin-right: 10px;
+    }
+
+    .result-item {
+      border-bottom: 1px solid #eee;
+      padding: 10px 8px;
+    }
+
+    .result-item .chinese {
+      font-size: 22px;
+      font-weight: bold;
+      margin: 5px 0;
+    }
+
+    .result-item .pinyin {
+      font-size: 18px;
+      color: #555;
+      margin: 5px 0;
+    }
+
+    #show_progress {
+      width: 90%;
+      font-size: 18px;
+      color: #888;
+    }
+
+    #show_result div {
+      border-bottom: 1px solid #eee;
+    }
+  </style>
+</head>
+
+<body>
+  <h3>☞[start]押して発音すると簡体字・ピンインに変換</h3>
+  <h3>終了する時は[stop]を押す</h3>
+  <button id="start_btn">start</button>
+  <button id="stop_btn" disabled>stop</button>
+  <br><br>
+  <small id="status"></small>
+  <!-- <h5>Recognition Progress</h5> -->
+  <h5> </h5>
+  <textarea id="show_progress" cols="100" rows="1" readonly></textarea>
+  <!-- <h5>Final Result</h5> -->
+  <h5> </h5>
+  <div id="show_result"></div>
+</body>
+<!-- 辞書ファイルとユーティリティファイルを読み込む -->
+<script type="text/javascript" src="dict/pinyin_dict_withtone.js"></script>
+<script type="text/javascript" src="dict/pinyin_dict_polyphone.js"></script>
+<script type="text/javascript" src="pinyinUtil.js"></script>
+
+<script>
+  function isAndroid() {
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    if (userAgent.match(/android/)) {
+      return true;
+    }
+    return false;
+  }
+  const isAndroidBrowser = isAndroid();
+  if (isAndroidBrowser) {
+    console.log("Android環境で実行中です。");
+  } else {
+    console.log("Android環境以外で実行中です。");
+  }
+  // Ensure browser compatibility for the SpeechRecognition API
+  window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (window.SpeechRecognition) {
+    const recognition = new SpeechRecognition();
+
+    // Web Speech API Configuration
+    recognition.lang = 'zh-CN'; // Mandarin (China)
+    recognition.interimResults = true;
+    recognition.continuous = true;
+
+    // Get DOM elements
+    const startBtn = document.getElementById('start_btn');
+    const stopBtn = document.getElementById('stop_btn');
+    const progressTextarea = document.getElementById('show_progress');
+    const resultDiv = document.getElementById('show_result');
+    const statusSpan = document.getElementById('status');
+
+    recognition.onsoundstart = function () {
+      statusSpan.textContent = "認識中...";
+    };
+    recognition.onnomatch = function () {
+      statusSpan.textContent = "認識できませんでした。もう一度お試しください。";
+    };
+    recognition.onerror = function (event) {
+      statusSpan.textContent = "エラー: " + event.error;
+    };
+    recognition.onsoundend = function () {
+      statusSpan.textContent = "待機中...";
+    };
+
+    startBtn.addEventListener('click', function () {
+      recognition.start();
+      this.disabled = true;
+      stopBtn.disabled = false;
+      statusSpan.textContent = "マイクに話しかけてください...";
+    });
+
+    stopBtn.addEventListener('click', function () {
+      recognition.stop();
+      this.disabled = true;
+      startBtn.disabled = false;
+      progressTextarea.value = '';
+      statusSpan.textContent = "停止しました。";
+    });
+
+    // 認識が（エラーや無音などで）終了した際に自動で再開するためのイベント
+    recognition.onend = function () {
+      if (!isAndroidBrowser) {
+        // ユーザーが手動でstopボタンを押していない場合のみ再開する
+        if (!stopBtn.disabled) {
+          recognition.start();
+        }
+
+      }
+    };
+
+    let lastFinalTranscript = ''; // 最後に確定したテキストを保存する変数
+
+    recognition.onresult = function (event) {
+      let interimTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          // 最終結果が前回と異なり、かつ空でない場合のみ処理
+          if (transcript.trim() && transcript !== lastFinalTranscript) {
+            lastFinalTranscript = transcript; // 今回の結果を保存
+
+            // ピンインに変換
+            const pinyin = pinyinUtil.getPinyin(transcript, ' ', true, true, true);
+
+            // 表示用の要素を作成
+            const resultItem = document.createElement('div');
+            resultItem.className = 'result-item';
+
+            const chineseP = document.createElement('p');
+            chineseP.className = 'chinese';
+            chineseP.textContent = transcript;
+
+            const pinyinP = document.createElement('p');
+            pinyinP.className = 'pinyin';
+            pinyinP.textContent = pinyin;
+
+            resultItem.appendChild(chineseP);
+            resultItem.appendChild(pinyinP);
+            // 新しい結果を一番上に表示
+            resultDiv.prepend(resultItem);
+          }
+          // 途中結果表示をクリア
+          progressTextarea.value = '';
+          interimTranscript = '';
+        } else {
+          interimTranscript += transcript;
+        }
+      }
+      progressTextarea.value = interimTranscript;
+    }
+  } else {
+    document.body.innerHTML = "<h2>お使いのブラウザはWeb Speech APIに対応していません。Google Chromeをお試しください。</h2>";
+  }
+</script>
+
+</html>
