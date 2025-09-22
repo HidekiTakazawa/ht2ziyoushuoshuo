@@ -181,7 +181,7 @@
           resultDiv.prepend(resultItem);
           progressTextarea.value = '';
         } else {
-          progressTextarea.value = transcript;
+          progressTextarea.value = event.results[i][0].transcript;
         }
 
       }
