@@ -81,19 +81,6 @@
 <script type="text/javascript" src="pinyinUtil.js"></script>
 
 <script>
-  function isAndroid() {
-    const userAgent = window.navigator.userAgent.toLowerCase();
-    if (userAgent.match(/android/)) {
-      return true;
-    }
-    return false;
-  }
-  const isAndroidBrowser = isAndroid();
-  if (isAndroidBrowser) {
-    console.log("Android環境で実行中です。");
-  } else {
-    console.log("Android環境以外で実行中です。");
-  }
   // Ensure browser compatibility for the SpeechRecognition API
   window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (window.SpeechRecognition) {
@@ -141,53 +128,55 @@
 
     // 認識が（エラーや無音などで）終了した際に自動で再開するためのイベント
     recognition.onend = function () {
-      if (!isAndroidBrowser) {
-        // ユーザーが手動でstopボタンを押していない場合のみ再開する
-        if (!stopBtn.disabled) {
-          recognition.start();
-        }
-
+      // ユーザーが手動でstopボタンを押していない場合のみ再開する
+      if (!stopBtn.disabled) {
+        recognition.start();
       }
     };
 
-    
+    let lastFinalTranscript = ''; // 最後に確定したテキストを保存する変数
 
     recognition.onresult = function (event) {
-      
+      let interimTranscript = '';
       for (let i = event.resultIndex; i < event.results.length; ++i) {
-
+        const transcript = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
           // 最終結果が前回と異なり、かつ空でない場合のみ処理
-          const transcript = event.results[i][0].transcript;
+          if (transcript.trim() && transcript !== lastFinalTranscript) {
+            lastFinalTranscript = transcript; // 今回の結果を保存
 
-          // ピンインに変換
-          const pinyin = pinyinUtil.getPinyin(transcript, ' ', true, true, true);
+            // ピンインに変換
+            const pinyin = pinyinUtil.getPinyin(transcript, ' ', true, true, true);
 
-          // 表示用の要素を作成
-          const resultItem = document.createElement('div');
-          resultItem.className = 'result-item';
-
-          const chineseP = document.createElement('p');
-          chineseP.className = 'chinese';
-          chineseP.textContent = transcript;
-
-          const pinyinP = document.createElement('p');
-          pinyinP.className = 'pinyin';
-          pinyinP.textContent = pinyin;
-
-          resultItem.appendChild(chineseP);
-          resultItem.appendChild(pinyinP);
-          // 新しい結果を一番上に表示
-          resultDiv.prepend(resultItem);
+            // 表示用の要素を作成
+            const resultItem = document.createElement('div');
+            resultItem.className = 'result-item';
+ 
+            const chineseP = document.createElement('p');
+            chineseP.className = 'chinese';
+            chineseP.textContent = transcript;
+ 
+            const pinyinP = document.createElement('p');
+            pinyinP.className = 'pinyin';
+            pinyinP.textContent = pinyin;
+ 
+            resultItem.appendChild(chineseP);
+            resultItem.appendChild(pinyinP);
+            // 新しい結果を一番上に表示
+            resultDiv.prepend(resultItem);
+          }
+          // 途中結果表示をクリア
           progressTextarea.value = '';
+          interimTranscript = '';
         } else {
-          progressTextarea.value = event.results[i][0].transcript;
+          interimTranscript += transcript;
         }
-
       }
-
-    };
-  } 
+      progressTextarea.value = interimTranscript;
+    }
+  } else {
+    document.body.innerHTML = "<h2>お使いのブラウザはWeb Speech APIに対応していません。Google Chromeをお試しください。</h2>";
+  }
 </script>
 
 </html>
