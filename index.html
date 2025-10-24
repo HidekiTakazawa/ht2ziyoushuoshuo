@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <title>Web Speech API自由说中文</title>
+  <title>自由说中文</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -66,6 +66,7 @@
   <h3>終了する時は[stop]を押す</h3>
   <button id="start_btn">start</button>
   <button id="stop_btn" disabled>stop</button>
+  <button id="copy_btn">履歴をコピー</button> <!-- ★変更点：コピーボタンを追加 -->
   <br><br>
   <small id="status"></small>
   <!-- <h5>Recognition Progress</h5> -->
@@ -94,6 +95,7 @@
     // Get DOM elements
     const startBtn = document.getElementById('start_btn');
     const stopBtn = document.getElementById('stop_btn');
+    const copyBtn = document.getElementById('copy_btn'); // ★変更点：コピーボタンの要素を取得
     const progressTextarea = document.getElementById('show_progress');
     const resultDiv = document.getElementById('show_result');
     const statusSpan = document.getElementById('status');
@@ -125,6 +127,48 @@
       progressTextarea.value = '';
       statusSpan.textContent = "停止しました。";
     });
+
+    // ★★★ここからが追加した機能★★★
+    // 「履歴をコピー」ボタンがクリックされたときの処理
+    copyBtn.addEventListener('click', function() {
+      // 履歴表示エリアからすべての結果アイテムを取得
+      const resultItems = resultDiv.querySelectorAll('.result-item');
+      
+      // 履歴が空の場合はアラートを表示して処理を終了
+      if (resultItems.length === 0) {
+        alert('コピーする履歴がありません。');
+        return;
+      }
+
+      let historyText = '';
+      // 取得したすべての履歴アイテムをループ処理
+      // 新しいものが先頭に追加されるので、表示されている順番でテキストを作成
+      resultItems.forEach(item => {
+        const chinese = item.querySelector('.chinese').textContent;
+        const pinyin = item.querySelector('.pinyin').textContent;
+        // 「簡体字(改行)ピンイン(改行)(改行)」の形式でテキストを結合
+        historyText += `${chinese}\n${pinyin}\n\n`;
+      });
+
+      // 整形したテキストをクリップボードにコピー
+      navigator.clipboard.writeText(historyText.trim()).then(() => {
+        // コピー成功時のフィードバック
+        const originalText = this.textContent;
+        this.textContent = 'コピーしました！';
+        this.disabled = true; // 連打防止
+        
+        // 1.5秒後にボタンのテキストと状態を元に戻す
+        setTimeout(() => {
+          this.textContent = originalText;
+          this.disabled = false;
+        }, 1500);
+      }).catch(err => {
+        // コピー失敗時のエラー処理
+        console.error('クリップボードへのコピーに失敗しました: ', err);
+        alert('コピーに失敗しました。');
+      });
+    });
+    // ★★★追加機能ここまで★★★
 
     // 認識が（エラーや無音などで）終了した際に自動で再開するためのイベント
     recognition.onend = function () {
